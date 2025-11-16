@@ -1,48 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
 <title>Planogram Scanner</title>
-<button onclick="alert('Button works')">TEST BUTTON</button>
-<script>
-console.log("ZXing:", ZXing);
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- ZXing Barcode Scanner -->
+<!-- ZXing Library (CORRECT VERSION) -->
 <script src="https://unpkg.com/@zxing/library@0.18.6"></script>
 
-<!-- JsBarcode for UPC barcode generation -->
+<!-- JsBarcode Library -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
 <style>
-    body { font-family: Arial, sans-serif; padding: 15px; }
-    h2 { margin-top: 30px; }
-    button { padding: 12px; width: 100%; margin-top: 10px; font-size: 18px; }
-    #preview { width: 100%; margin-top: 10px; border: 1px solid #ccc; }
-    #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
-    .label { font-weight: bold; }
-    #barcodeCanvas { width: 100%; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { width: 100%; padding: 15px; margin-top: 12px; font-size: 18px; }
+    video { width: 100%; margin-top: 15px; border: 1px solid #ccc; }
+    #output { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    td, th { border: 1px solid #ccc; padding: 6px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
 </style>
 </head>
 <body>
 
-<h1>Planogram Scanner</h1>
+<h2>Planogram Scanner</h2>
 
 <video id="preview" playsinline></video>
 
 <button onclick="startScan('location')">Scan Location (QR)</button>
-<button onclick="startScan('product')">Scan Product (UPC/Code128)</button>
+<button onclick="startScan('product')">Scan Product (UPC/128)</button>
 
 <div id="output">
-    <div><span class="label">Location:</span> <span id="locationText">—</span></div>
-    <div><span class="label">Product UPC:</span> <span id="productText">—</span></div>
+    <div><strong>Location:</strong> <span id="locationText">—</span></div>
+    <div><strong>Product:</strong> <span id="productText">—</span></div>
     <br>
     <svg id="barcodeCanvas"></svg>
 </div>
 
-<h2>Planogram Records</h2>
+<h3>Recorded Entries</h3>
 <table id="recordsTable">
     <tr><th>Location</th><th>UPC</th></tr>
 </table>
@@ -50,37 +44,43 @@ console.log("ZXing:", ZXing);
 <button onclick="exportCSV()">Export CSV</button>
 
 <script>
-let selectedType = "";
+let currentScan = "";
 let locationCode = "";
 let productCode = "";
 
 async function startScan(type) {
-    console.log("StartScan triggered. ZXing =", ZXing);
-alert("startScan running");
-
-    selectedType = type;
-    
-
+    currentScan = type;
     const videoElem = document.getElementById("preview");
 
-    const codeReader = new ZXing.BrowserBarcodeReader();  // ← WORKS!
+    // Ensure ZXing loaded
+    if (!ZXing || !ZXing.BrowserBarcodeReader) {
+        alert("ZXing did not load. Check network connection.");
+        return;
+    }
+
+    console.log("Starting scanner…");
+
+    const reader = new ZXing.BrowserBarcodeReader();
 
     try {
-        await codeReader.decodeFromVideoDevice(
-            null,           // auto-select camera
+        await reader.decodeFromVideoDevice(
+            null,
             videoElem,
             (result, err) => {
                 if (result) {
-                    if (selectedType === "location") {
+                    console.log("Scan result:", result.text);
+
+                    if (currentScan === "location") {
                         locationCode = result.text;
                         document.getElementById("locationText").innerText = locationCode;
                     } else {
-                        productCode = result.text;
+                        productCode = result.text.replace(/[^0-9A-Za-z]/g, "");
                         document.getElementById("productText").innerText = productCode;
-                        generateBarcode(productCode);
+                        drawBarcode(productCode);
                         addRecord(locationCode, productCode);
                     }
-                    codeReader.reset();  // stop camera after scan
+
+                    reader.reset();
                 }
             }
         );
@@ -88,22 +88,27 @@ alert("startScan running");
         alert("Camera Error: " + e);
     }
 }
-function generateBarcode(upc) {
-    if (!upc) return;
-    JsBarcode("#barcodeCanvas", upc, {
-        format: upc.length === 12 ? "upc" : "CODE128",
-        lineColor: "#000",
+
+function drawBarcode(code) {
+    if (!code) return;
+
+    const type = code.length === 12 ? "upc" : "CODE128";
+
+    JsBarcode("#barcodeCanvas", code, {
+        format: type,
         width: 2,
         height: 100,
+        lineColor: "#000",
         displayValue: true
     });
 }
 
-function addRecord(location, upc) {
-    if (!location || !upc) return;
+function addRecord(loc, upc) {
+    if (!loc || !upc) return;
+
     const table = document.getElementById("recordsTable");
     const row = table.insertRow(-1);
-    row.insertCell(0).innerText = location;
+    row.insertCell(0).innerText = loc;
     row.insertCell(1).innerText = upc;
 }
 
@@ -111,22 +116,20 @@ function exportCSV() {
     let csv = "Location,UPC\n";
     const rows = document.querySelectorAll("#recordsTable tr");
 
-    rows.forEach((row, idx) => {
-        if (idx === 0) return;
+    rows.forEach((row, i) => {
+        if (i === 0) return;
         const cols = row.querySelectorAll("td");
         csv += `${cols[0].innerText},${cols[1].innerText}\n`;
     });
 
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
     a.href = url;
     a.download = "planogram.csv";
     a.click();
 }
 </script>
-
 
 </body>
 </html>
