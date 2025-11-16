@@ -5,7 +5,7 @@
 <title>Planogram Scanner</title>
 
 <!-- ZXing Barcode Scanner -->
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script src="https://unpkg.com/@zxing/library@0.18.6"></script>
 
 <!-- JsBarcode for UPC barcode generation -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
@@ -54,28 +54,35 @@ let scanner;
 async function startScan(type) {
     selectedType = type;
 
-    const codeReader = new ZXing.BrowserMultiFormatReader();
     const videoElem = document.getElementById('preview');
 
+    const codeReader = new ZXing.BrowserBarcodeReader();  // <-- FIXED
+
     try {
-        scanner = await codeReader.decodeFromVideoDevice(
+        await codeReader.decodeFromVideoDevice(
             null,
             videoElem,
             (result, err) => {
                 if (result) {
+
                     if (selectedType === "location") {
                         locationCode = result.text;
                         document.getElementById("locationText").innerText = locationCode;
+
                     } else {
+
                         productCode = result.text.replace(/[^0-9A-Za-z]/g,"");
                         document.getElementById("productText").innerText = productCode;
+
                         generateBarcode(productCode);
                         addRecord(locationCode, productCode);
                     }
+
                     codeReader.reset();
                 }
             }
         );
+
     } catch (e) {
         alert("Camera error: " + e);
     }
@@ -119,6 +126,7 @@ function exportCSV() {
     a.click();
 }
 </script>
+
 
 </body>
 </html>
