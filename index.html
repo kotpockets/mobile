@@ -49,45 +49,37 @@
 let selectedType = "";
 let locationCode = "";
 let productCode = "";
-let scanner;
 
 async function startScan(type) {
     selectedType = type;
 
-    const videoElem = document.getElementById('preview');
+    const videoElem = document.getElementById("preview");
 
-    const codeReader = new ZXing.BrowserBarcodeReader();  // <-- FIXED
+    const codeReader = new ZXing.BrowserBarcodeReader();  // ← WORKS!
 
     try {
         await codeReader.decodeFromVideoDevice(
-            null,
+            null,           // auto-select camera
             videoElem,
             (result, err) => {
                 if (result) {
-
                     if (selectedType === "location") {
                         locationCode = result.text;
                         document.getElementById("locationText").innerText = locationCode;
-
                     } else {
-
-                        productCode = result.text.replace(/[^0-9A-Za-z]/g,"");
+                        productCode = result.text;
                         document.getElementById("productText").innerText = productCode;
-
                         generateBarcode(productCode);
                         addRecord(locationCode, productCode);
                     }
-
-                    codeReader.reset();
+                    codeReader.reset();  // stop camera after scan
                 }
             }
         );
-
     } catch (e) {
-        alert("Camera error: " + e);
+        alert("Camera Error: " + e);
     }
 }
-
 function generateBarcode(upc) {
     if (!upc) return;
     JsBarcode("#barcodeCanvas", upc, {
