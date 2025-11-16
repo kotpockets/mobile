@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planogram Scanner</title>
+
+<!-- ZXing Barcode Scanner -->
+<script src="https://unpkg.com/@zxing/browser@latest"></script>
+
+<!-- JsBarcode for UPC barcode generation -->
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+<style>
+    body { font-family: Arial, sans-serif; padding: 15px; }
+    h2 { margin-top: 30px; }
+    button { padding: 12px; width: 100%; margin-top: 10px; font-size: 18px; }
+    #preview { width: 100%; margin-top: 10px; border: 1px solid #ccc; }
+    #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    .label { font-weight: bold; }
+    #barcodeCanvas { width: 100%; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    td, th { border: 1px solid #ccc; padding: 6px; }
+</style>
+</head>
+<body>
+
+<h1>Planogram Scanner</h1>
+
+<video id="preview" playsinline></video>
+
+<button onclick="startScan('location')">Scan Location (QR)</button>
+<button onclick="startScan('product')">Scan Product (UPC/Code128)</button>
+
+<div id="output">
+    <div><span class="label">Location:</span> <span id="locationText">—</span></div>
+    <div><span class="label">Product UPC:</span> <span id="productText">—</span></div>
+    <br>
+    <svg id="barcodeCanvas"></svg>
+</div>
+
+<h2>Planogram Records</h2>
+<table id="recordsTable">
+    <tr><th>Location</th><th>UPC</th></tr>
+</table>
+
+<button onclick="exportCSV()">Export CSV</button>
+
+<script>
+let selectedType = "";
+let locationCode = "";
+let productCode = "";
+let scanner;
+
+async function startScan(type) {
+    selectedType = type;
+
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    const videoElem = document.getElementById('preview');
+
+    try {
+        scanner = await codeReader.decodeFromVideoDevice(
+            null,
+            videoElem,
+            (result, err) => {
+                if (result) {
+                    if (selectedType === "location") {
+                        locationCode = result.text;
+                        document.getElementById("locationText").innerText = locationCode;
+                    } else {
+                        productCode = result.text.replace(/[^0-9A-Za-z]/g,"");
+                        document.getElementById("productText").innerText = productCode;
+                        generateBarcode(productCode);
+                        addRecord(locationCode, productCode);
+                    }
+                    codeReader.reset();
+                }
+            }
+        );
+    } catch (e) {
+        alert("Camera error: " + e);
+    }
+}
+
+function generateBarcode(upc) {
+    if (!upc) return;
+    JsBarcode("#barcodeCanvas", upc, {
+        format: upc.length === 12 ? "upc" : "CODE128",
+        lineColor: "#000",
+        width: 2,
+        height: 100,
+        displayValue: true
+    });
+}
+
+function addRecord(location, upc) {
+    if (!location || !upc) return;
+    const table = document.getElementById("recordsTable");
+    const row = table.insertRow(-1);
+    row.insertCell(0).innerText = location;
+    row.insertCell(1).innerText = upc;
+}
+
+function exportCSV() {
+    let csv = "Location,UPC\n";
+    const rows = document.querySelectorAll("#recordsTable tr");
+
+    rows.forEach((row, idx) => {
+        if (idx === 0) return;
+        const cols = row.querySelectorAll("td");
+        csv += `${cols[0].innerText},${cols[1].innerText}\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "planogram.csv";
+    a.click();
+}
+</script>
+
+</body>
+</html>
