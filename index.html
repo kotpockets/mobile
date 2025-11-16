@@ -55,7 +55,11 @@ let locationCode = "";
 let productCode = "";
 
 async function startScan(type) {
+    console.log("StartScan triggered. ZXing =", ZXing);
+alert("startScan running");
+
     selectedType = type;
+    
 
     const videoElem = document.getElementById("preview");
 
